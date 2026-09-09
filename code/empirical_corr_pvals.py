@@ -362,27 +362,26 @@ def combine_results(ctype_specific_SEs_basic, ctype_specific_SEs_strict,
         for other_ct in other_cts:
             # initialize all as NaN
             all_sig[f'r_diff_{other_ct}'] = np.nan
-            all_sig[f'fdr_diff_{other_ct}'] = np.nan  # renamed
+            all_sig[f'fdr_diff_{other_ct}'] = np.nan
 
-            if len(specific_idx) == 0:
-                continue
+            # if len(specific_idx) == 0:
+            #     continue
 
             if (target_ct, other_ct) in steiger_results:
                 sdf = steiger_results[(target_ct, other_ct)]
-                r_diff_vals = sdf.loc[specific_idx, 'r_diff'].values
-                fdr_vals = sdf.loc[specific_idx, 'fdr'].values
+                r_diff_vals = sdf.loc[all_sig.index, 'r_diff'].values
+                fdr_vals = sdf.loc[all_sig.index, 'fdr'].values
             elif (other_ct, target_ct) in steiger_results:
                 sdf = steiger_results[(other_ct, target_ct)]
-                r_diff_vals = sdf.loc[specific_idx, 'r_diff'].values * -1  # flip sign
-                fdr_vals = sdf.loc[specific_idx, 'fdr'].values             # fdr stays the same
+                r_diff_vals = r_diff_vals = sdf.loc[all_sig.index,'r_diff'].values * -1  # flip sign
+                fdr_vals = fdr_vals = sdf.loc[all_sig.index, 'fdr'].values             # fdr stays the same
             else:
                 continue
 
-            all_sig.loc[specific_idx, f'r_diff_{other_ct}'] = r_diff_vals
-            all_sig.loc[specific_idx, f'fdr_diff_{other_ct}'] = fdr_vals
+            all_sig[f'r_diff_{other_ct}'] = r_diff_vals
+            all_sig[f'fdr_diff_{other_ct}'] = fdr_vals
 
         combined[target_ct] = all_sig.sort_values('r', ascending=False)
 
     return combined
-
     

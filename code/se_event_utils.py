@@ -216,11 +216,8 @@ def mark_sibling_variants(event_info, event_coords):
     return event_info
 
 def score_transcript(t, x):
-    type = str(x['transcript_type'])
     tag = str(x['transcript_tag'])
-    
     return (
-        int("protein_coding" in type),
         int("MANE_Select" in tag),
         int("MANE_Plus_Clinical" in tag),
         int("appris_principal" in tag),

@@ -78,6 +78,9 @@ def plot_ct_SE_barplots(
             if len(SE_df_subset) == 0:
                 print(f"No {target_ct} specific SEs.")
                 continue
+
+                print(f"Plotting {len(SE_df_subset)} {target_ct} specific SEs.")
+                
         else:
             other_cts = [ct for ct in ct_cols if ct != target_ct]
 
@@ -86,11 +89,13 @@ def plot_ct_SE_barplots(
                 mask = SE_df[target_ct] > SE_df[other_cts].max(axis=1)
                 
             else:
-                SE_df = SE_df[SE_df['r'] < 0]
+                SE_df = SE_df[SE_df['r'] < 0].sort_values(target_ct)
                 mask = SE_df[target_ct] < SE_df[other_cts].min(axis=1)
                 
             SE_df_subset = SE_df[mask][:top_n] 
-        
+            
+            print(f"Plotting {len(SE_df_subset)} {target_ct} enriched SEs")
+                  
         pdf_path = f"{outdir}/{data_source}_{_safe(target_ct)}_specific_SEs_{direction}_specific{specific}.pdf"
 
         with PdfPages(pdf_path) as pdf:

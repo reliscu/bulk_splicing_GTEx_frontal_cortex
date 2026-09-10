@@ -70,37 +70,37 @@ def plot_ct_SE_barplots(
     if not ct_cols:
         ct_cols = [c for c in psi_corr_df.columns if c != 'Gene']
 
-    for target_ct, SE_df in ct_SEs.items():
+    for target_ct, se_df in ct_SEs.items():
         
         if specific:
-            SE_df_subset = SE_df[SE_df['specific_direction'] == direction]
+            se_df_subset = se_df[se_df['specific_direction'] == direction]
 
-            if len(SE_df_subset) == 0:
+            if len(se_df_subset) == 0:
                 print(f"No {target_ct} specific SEs.")
                 continue
 
-            print(f"Plotting {len(SE_df_subset)} {target_ct} specific SEs.")
+            print(f"Plotting {len(se_df_subset)} {target_ct} specific SEs.")
                 
         else:
             other_cts = [ct for ct in ct_cols if ct != target_ct]
 
             if direction == "highest":
-                SE_df = SE_df[SE_df['r'] > 0]
-                mask = SE_df[target_ct] > SE_df[other_cts].max(axis=1)
+                se_df = se_df[se_df['r'] > 0]
+                mask = se_df[target_ct] > se_df[other_cts].max(axis=1)
                 
             else:
-                SE_df = SE_df[SE_df['r'] < 0].sort_values(target_ct)
-                mask = SE_df[target_ct] < SE_df[other_cts].min(axis=1)
+                se_df = se_df[se_df['r'] < 0].sort_values(target_ct)
+                mask = se_df[target_ct] < se_df[other_cts].min(axis=1)
             
             n = min(sum(mask), top_n)
-            SE_df_subset = SE_df[mask][:n] 
+            se_df_subset = se_df[mask][:n] 
             
-            print(f"Plotting {len(SE_df_subset)} {target_ct} enriched SEs")
+            print(f"Plotting {len(se_df_subset)} {target_ct} enriched SEs")
                   
-        pdf_path = f"{outdir}/{data_source}_{_safe(target_ct)}_{len(SE_df_subset)}_SEs_{direction}_specific{specific}.pdf"
+        pdf_path = f"{outdir}/{data_source}_{_safe(target_ct)}_{len(se_df_subset)}_SEs_{direction}_specific{specific}.pdf"
 
         with PdfPages(pdf_path) as pdf:
-            for idx, row in SE_df_subset.iterrows():
+            for idx, row in se_df_subset.iterrows():
                 gene = row['gene_name']
                 is_specific = row['is_specific'] 
                 event = "_".join(idx.split("_")[1:])
@@ -179,7 +179,6 @@ def plot_ct_SE_barplots(
                 # --- right panel: gene expression correlations ---
                 axes[1].set_title(f'{gene} gene expression', fontsize=TITLE_SIZE)
                 axes[1].bar(x, r_corr_vals, color=colors, edgecolor='black', linewidth=1)
-                # axes[1].set_ylabel('Spearman r', fontsize=LABEL_SIZE)
                 axes[1].axhline(0, color='black', linewidth=0.6)
                 axes[1].set_xticks(x)
                 axes[1].set_xticklabels(ct_cols, rotation=45, ha='right', fontsize=TICK_SIZE)

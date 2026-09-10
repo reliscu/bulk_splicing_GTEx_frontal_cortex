@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from gtfparse import read_gtf
 
-def process_gtf(gtf_file, exclude, gene_name, no_trim_id, gene_type_tag, transcript_type_tag):
+def process_gtf(gtf_file, exclude, no_trim_id, gene_type_tag, transcript_type_tag):
 
     print('Processing GTF file...')
     
@@ -26,11 +26,11 @@ def process_gtf(gtf_file, exclude, gene_name, no_trim_id, gene_type_tag, transcr
         raise Exception('Isufficient information to create annotation. transcript_id is needed to find cassette exons.')
 
     if not no_trim_id:
-        gtf['gene'] = gtf.gene.str.replace(r'\.\d+$', '', regex=True)
+        gtf['gene_id'] = gtf.gene_id.str.replace(r'\.\d+$', '', regex=True)
 
     gtf.transcript = [x.split('.')[0] for x in gtf.transcript]
     gtf.exon_id = [x.split('.')[0] for x in gtf.exon_id]
      
-    gtf = gtf.loc[gtf.gene != '']
+    gtf = gtf.loc[gtf.gene_id != '']
         
     return gtf

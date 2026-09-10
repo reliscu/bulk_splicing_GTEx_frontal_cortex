@@ -55,9 +55,6 @@ def spearman_permutation_test(psi, eigengene_df, n_perms=1000, ci=0.95, seed=42)
     psi_ci_lower_df   : analytical CI lower bounds
     psi_ci_upper_df   : analytical CI upper bounds
     perm_corr_results : dict {ct: (n_SEs, n_perms) array} of permuted correlations
-    psi_rank_centered : (n_SEs, n_samples) centered rank matrix (for bootstrap CIs)
-    psi_rank_norm     : (n_SEs, 1) rank norms (for bootstrap CIs)
-    ct_ranks_dict     : dict {ct: (n_samples,) array} of ranked ct values (for bootstrap CIs)
     """
     np.random.seed(seed)
  
@@ -82,12 +79,10 @@ def spearman_permutation_test(psi, eigengene_df, n_perms=1000, ci=0.95, seed=42)
     corr_results = {}
     pval_results = {}
     perm_corr_results = {}
-    ct_ranks_dict = {}
  
     for ct in eigengene_df.columns:
         ct_vals = eigengene_df[ct].values
         ct_ranks = rankdata(ct_vals, method='average')
-        ct_ranks_dict[ct] = ct_ranks
  
         # --- observed correlation ---
         ct_centered = ct_ranks - ct_ranks.mean()
@@ -106,7 +101,7 @@ def spearman_permutation_test(psi, eigengene_df, n_perms=1000, ci=0.95, seed=42)
         perm_corrs = num / denom                             # (n_SEs, n_perms)
  
         # --- two-tailed permutation p-values ---
-        pvals = (np.abs(perm_corrs) >= np.abs(observed[:, np.newaxis])).mean(axis=1)
+        pvals = ((np.abs(perm_corrs) >= np.abs(observed[:, np.newaxis])).sum(axis=1) + 1) / (n_perms + 1)
  
         corr_results[ct] = observed
         pval_results[ct] = pvals
@@ -116,10 +111,7 @@ def spearman_permutation_test(psi, eigengene_df, n_perms=1000, ci=0.95, seed=42)
  
     # --- assemble output dataframes ---
     psi_corr_df = pd.DataFrame(corr_results, index=psi.index)
-    # psi_corr_df.insert(0, 'Gene', psi_anno['gene_name'])
- 
     psi_pval_df = pd.DataFrame(pval_results, index=psi.index)
-    # psi_pval_df.insert(0, 'Gene', psi_anno['gene_name'])
  
     # --- BH-FDR correction within each cell type ---
     psi_fdr_df = psi_pval_df.copy()
@@ -139,8 +131,7 @@ def spearman_permutation_test(psi, eigengene_df, n_perms=1000, ci=0.95, seed=42)
         psi_ci_lower_df[ct] = lower
         psi_ci_upper_df[ct] = upper
  
-    return (psi_corr_df, psi_pval_df, psi_fdr_df, psi_ci_lower_df, psi_ci_upper_df,
-            perm_corr_results, psi_rank_centered, psi_rank_norm, ct_ranks_dict)
+    return (psi_corr_df, psi_pval_df, psi_fdr_df, psi_ci_lower_df, psi_ci_upper_df, perm_corr_results)
 
 
 # =============================================================================
@@ -182,11 +173,11 @@ def compare_all_ct_pairs(psi_corr_df, perm_corr_results, ct_cols):
         observed_diff = observed_ct1 - observed_ct2           # (n_SEs,)
         perm_diff = perm_ct1 - perm_ct2                       # (n_SEs, n_perms)
 
-      # one-tailed p-value in the observed direction
+        # one-tailed p-value in the observed direction
         pvals = np.where(
             observed_diff >= 0,
-            (perm_diff >= observed_diff[:, np.newaxis]).mean(axis=1),  # p(ct1 > ct2)
-            (perm_diff <= observed_diff[:, np.newaxis]).mean(axis=1)   # p(ct1 < ct2)
+            ((perm_diff >= observed_diff[:, np.newaxis]).sum(axis=1) + 1) / (perm_diff.shape[1] + 1),  # p(ct1 > ct2)
+            ((perm_diff <= observed_diff[:, np.newaxis]).sum(axis=1) + 1) / (perm_diff.shape[1] + 1) # p(ct1 < ct2)
         )
 
         mask = ~np.isnan(pvals)
@@ -198,7 +189,6 @@ def compare_all_ct_pairs(psi_corr_df, perm_corr_results, ct_cols):
         }
         #             'mask': mask,
         
-        # collect valid (non-NaN) pvals for FDR correction
         # we concatenate across all pairs so FDR is corrected globally
         all_pvals.append(pvals[mask])
         all_keys.append((ct1, ct2))
@@ -263,7 +253,6 @@ def find_specific_SEs_per_ct(steiger_results, psi_fdr_df, psi_corr_df, ct_hierar
     steiger_results : dict from compare_all_ct_pairs
     psi_fdr_df      : FDR DataFrame (no Gene column)
     psi_corr_df     : correlation DataFrame (with Gene column)
-    ct_hierarchy    : dict {ct: [children to skip]}
     fdr_thresh      : float
     ascending       : bool, if True find SEs where target has LOWEST correlation
 
@@ -271,13 +260,17 @@ def find_specific_SEs_per_ct(steiger_results, psi_fdr_df, psi_corr_df, ct_hierar
     -------
     dict of {ct: DataFrame}
     """
+    
+    # ct_hierarchy    : dict {ct: [children to skip]}
+
     ct_cols = [c for c in psi_fdr_df.columns if c != 'Gene']
     results = {}
 
     for target_ct in ct_cols:
         children_to_skip = ct_hierarchy.get(target_ct, [])
-        other_cts = [ct for ct in ct_cols if ct != target_ct and ct not in children_to_skip]
-
+        # other_cts = [ct for ct in ct_cols if ct != target_ct and ct not in children_to_skip]
+        other_cts = [ct for ct in ct_cols if ct != target_ct]
+        
         # condition 1: significant in target cell type
         sig_mask = psi_fdr_df[target_ct] < fdr_thresh
 
@@ -288,16 +281,34 @@ def find_specific_SEs_per_ct(steiger_results, psi_fdr_df, psi_corr_df, ct_hierar
             
             if (target_ct, other_ct) in steiger_results:
                 df = steiger_results[(target_ct, other_ct)]
-                if ascending:
-                    ct_greater = (df['r_diff'] < 0) & (df['fdr'] < fdr_thresh)
+                
+                if other_ct not in children_to_skip:
+                    if ascending:
+                        ct_greater = (df['r_diff'] < 0) & (df['fdr'] < fdr_thresh)
+                    else:
+                        ct_greater = (df['r_diff'] > 0) & (df['fdr'] < fdr_thresh)
+                        
                 else:
-                    ct_greater = (df['r_diff'] > 0) & (df['fdr'] < fdr_thresh)
+                    # don't require the `r_diff` to be stasticially significant w.r.t. child cell types
+                    if ascending:
+                        ct_greater = df['r_diff'] < 0
+                    else:
+                        ct_greater = df['r_diff'] > 0
+                        
             elif (other_ct, target_ct) in steiger_results:
                 df = steiger_results[(other_ct, target_ct)]
-                if ascending:
-                    ct_greater = (df['r_diff'] > 0) & (df['fdr'] < fdr_thresh)
+                
+                if other_ct not in children_to_skip:
+                    if ascending:
+                        ct_greater = (df['r_diff'] > 0) & (df['fdr'] < fdr_thresh)
+                    else:
+                        ct_greater = (df['r_diff'] < 0) & (df['fdr'] < fdr_thresh)
+                        
                 else:
-                    ct_greater = (df['r_diff'] < 0) & (df['fdr'] < fdr_thresh)
+                    if ascending:
+                        ct_greater = df['r_diff'] > 0
+                    else:
+                        ct_greater = df['r_diff'] < 0
             else:
                 print(f"Warning: no result found for ({target_ct}, {other_ct})")
                 ct_greater = pd.Series(False, index=psi_fdr_df.index)
@@ -357,15 +368,11 @@ def combine_results(ctype_specific_SEs_basic, ctype_specific_SEs_strict,
         children_to_skip = ct_hierarchy.get(target_ct, [])
         other_cts = [ct for ct in ct_cols if ct != target_ct and ct not in children_to_skip]
 
-        specific_idx = all_sig[all_sig['is_specific']].index
 
         for other_ct in other_cts:
             # initialize all as NaN
             all_sig[f'r_diff_{other_ct}'] = np.nan
             all_sig[f'fdr_diff_{other_ct}'] = np.nan
-
-            # if len(specific_idx) == 0:
-            #     continue
 
             if (target_ct, other_ct) in steiger_results:
                 sdf = steiger_results[(target_ct, other_ct)]

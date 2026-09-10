@@ -51,7 +51,7 @@ def plot_corr_distros(
     plt.close()
 
 def plot_ct_SE_barplots(
-    ctype_specific_SEs,
+    ct_SEs,
     psi_corr_df,
     psi_fdr_df,
     expr_corr_df,
@@ -70,16 +70,16 @@ def plot_ct_SE_barplots(
     if not ct_cols:
         ct_cols = [c for c in psi_corr_df.columns if c != 'Gene']
 
-    for target_ct, SE_df in ctype_specific_SEs.items():
+    for target_ct, SE_df in ct_SEs.items():
         
         if specific:
-            SE_df_subset = SE_df[SE_df['direction'] == direction]
+            SE_df_subset = SE_df[SE_df['specific_direction'] == direction]
 
             if len(SE_df_subset) == 0:
                 print(f"No {target_ct} specific SEs.")
                 continue
 
-                print(f"Plotting {len(SE_df_subset)} {target_ct} specific SEs.")
+            print(f"Plotting {len(SE_df_subset)} {target_ct} specific SEs.")
                 
         else:
             other_cts = [ct for ct in ct_cols if ct != target_ct]
@@ -91,12 +91,13 @@ def plot_ct_SE_barplots(
             else:
                 SE_df = SE_df[SE_df['r'] < 0].sort_values(target_ct)
                 mask = SE_df[target_ct] < SE_df[other_cts].min(axis=1)
-                
-            SE_df_subset = SE_df[mask][:top_n] 
+            
+            n = min(sum(mask), top_n)
+            SE_df_subset = SE_df[mask][:n] 
             
             print(f"Plotting {len(SE_df_subset)} {target_ct} enriched SEs")
                   
-        pdf_path = f"{outdir}/{data_source}_{_safe(target_ct)}_specific_SEs_{direction}_specific{specific}.pdf"
+        pdf_path = f"{outdir}/{data_source}_{_safe(target_ct)}_{len(SE_df_subset)}_SEs_{direction}_specific{specific}.pdf"
 
         with PdfPages(pdf_path) as pdf:
             for idx, row in SE_df_subset.iterrows():

@@ -94,6 +94,8 @@ def map_exon_to_protein(es, ee, cds_obj, strict=True):
     return {
         'aa_start': rel_exon_start // 3,
         'aa_end': rel_exon_end // 3,
+        'exon_cds_start': exon_cds_start,
+        'exon_cds_end': exon_cds_end,
         'coding_nt_length': coding_nt_length,
         'overlap_type': overlap_type,
         'gtf_frame': gtf_frame,
